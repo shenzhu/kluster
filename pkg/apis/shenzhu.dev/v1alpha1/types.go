@@ -14,9 +14,10 @@ type Kluster struct {
 }
 
 type KlusterSpec struct {
-	Name    string `json:"name,omitempty"`
-	Region  string `json:"region,omitempty"`
-	Version string `json:"version,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Region      string `json:"region,omitempty"`
+	Version     string `json:"version,omitempty"`
+	TokenSecret string `json:"tokenSecret,omitempty"`
 
 	NodePools []NodePool `json:"nodePools,omitempty"`
 }

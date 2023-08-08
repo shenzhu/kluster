@@ -1,18 +1,17 @@
 package main
 
 import (
-	"context"
 	"flag"
-	"fmt"
 	"log"
 	"path/filepath"
+	"time"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	klient "github.com/shenzhu/kluster/pkg/client/clientset/versioned"
+	kInfoFac "github.com/shenzhu/kluster/pkg/client/informers/externalversions"
+	"github.com/shenzhu/kluster/pkg/controller"
 )
 
 func main() {
@@ -34,9 +33,13 @@ func main() {
 		log.Printf("error building klientset: %v", err)
 	}
 
-	klusters, err := klientset.ShenzhuV1alpha1().Klusters("").List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		log.Printf("error listing klusters: %v", err)
+	infoFactory := kInfoFac.NewSharedInformerFactory(klientset, 20*time.Minute)
+
+	ch := make(chan struct{})
+	c := controller.NewController(klientset, infoFactory.Shenzhu().V1alpha1().Klusters())
+
+	infoFactory.Start(ch)
+	if err := c.Run(ch); err != nil {
+		log.Printf("error running controller: %v", err.Error())
 	}
-	fmt.Printf("length of klusters: %d\n", len(klusters.Items))
 }

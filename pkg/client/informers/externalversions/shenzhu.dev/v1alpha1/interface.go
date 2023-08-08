@@ -18,17 +18,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	internalinterfaces "github.com/shenzhu/kluster/pkg/client/informers/internalversion/internalinterfaces"
-	internalversion "github.com/shenzhu/kluster/pkg/client/informers/internalversion/v1alpha1/internalversion"
+	internalinterfaces "github.com/shenzhu/kluster/pkg/client/informers/externalversions/internalinterfaces"
 )
 
-// Interface provides access to each of this group's versions.
+// Interface provides access to all the informers in this group version.
 type Interface interface {
-	// InternalVersion provides access to shared informers for resources in InternalVersion.
-	InternalVersion() internalversion.Interface
+	// Klusters returns a KlusterInformer.
+	Klusters() KlusterInformer
 }
 
-type group struct {
+type version struct {
 	factory          internalinterfaces.SharedInformerFactory
 	namespace        string
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
@@ -36,10 +35,10 @@ type group struct {
 
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
-	return &group{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// InternalVersion returns a new internalversion.Interface.
-func (g *group) InternalVersion() internalversion.Interface {
-	return internalversion.New(g.factory, g.namespace, g.tweakListOptions)
+// Klusters returns a KlusterInformer.
+func (v *version) Klusters() KlusterInformer {
+	return &klusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
