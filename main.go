@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
@@ -33,10 +34,16 @@ func main() {
 		log.Printf("error building klientset: %v", err)
 	}
 
+	// Create clientset for Kubernetes
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Printf("error building clientset: %v", err)
+	}
+
 	infoFactory := kInfoFac.NewSharedInformerFactory(klientset, 20*time.Minute)
 
 	ch := make(chan struct{})
-	c := controller.NewController(klientset, infoFactory.Shenzhu().V1alpha1().Klusters())
+	c := controller.NewController(clientset, klientset, infoFactory.Shenzhu().V1alpha1().Klusters())
 
 	infoFactory.Start(ch)
 	if err := c.Run(ch); err != nil {

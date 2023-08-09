@@ -1,19 +1,25 @@
 package controller
 
 import (
+	"fmt"
 	"log"
 	"time"
 
 	klientset "github.com/shenzhu/kluster/pkg/client/clientset/versioned"
 	kinf "github.com/shenzhu/kluster/pkg/client/informers/externalversions/shenzhu.dev/v1alpha1"
 	klister "github.com/shenzhu/kluster/pkg/client/listers/shenzhu.dev/v1alpha1"
+	"github.com/shenzhu/kluster/pkg/do"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
 
 type Controller struct {
+	// clientset
+	client kubernetes.Interface
+
 	// clientset for custom resource kluster
 	klient klientset.Interface
 
@@ -27,8 +33,9 @@ type Controller struct {
 	wq workqueue.RateLimitingInterface
 }
 
-func NewController(klient klientset.Interface, klusterInformer kinf.KlusterInformer) *Controller {
+func NewController(client kubernetes.Interface, klient klientset.Interface, klusterInformer kinf.KlusterInformer) *Controller {
 	c := &Controller{
+		client:        client,
 		klient:        klient,
 		klusterSynced: klusterInformer.Informer().HasSynced,
 		kLister:       klusterInformer.Lister(),
@@ -91,8 +98,14 @@ func (c *Controller) processNextItem() bool {
 
 	log.Printf("processing kluster: %+v", kluster.Spec)
 
-	return true
+	clusterID, err := do.Create(c.client, kluster.Spec)
+	if err != nil {
+		log.Printf("error creating kluster: %v", err)
+		return false
+	}
 
+	fmt.Printf("clusterID: %s\n", clusterID)
+	return true
 }
 
 func (c *Controller) handleAdd(obj interface{}) {
