@@ -18,3 +18,16 @@ controller-gen paths=github.com/shenzhu/kluster/pkg/apis/shenzhu.dev/v1alpha1 cr
 
 k create secret generic dosecret --from-literal token=[token]
 ```
+
+```
+apiVersion
+kind
+metadata:
+spec:
+    ...
+    ...
+status:
+    clusterId
+    progress
+    kubeconfig
+```

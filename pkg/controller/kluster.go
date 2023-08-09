@@ -1,14 +1,17 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/shenzhu/kluster/pkg/apis/shenzhu.dev/v1alpha1"
 	klientset "github.com/shenzhu/kluster/pkg/client/clientset/versioned"
 	kinf "github.com/shenzhu/kluster/pkg/client/informers/externalversions/shenzhu.dev/v1alpha1"
 	klister "github.com/shenzhu/kluster/pkg/client/listers/shenzhu.dev/v1alpha1"
 	"github.com/shenzhu/kluster/pkg/do"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -103,9 +106,23 @@ func (c *Controller) processNextItem() bool {
 		log.Printf("error creating kluster: %v", err)
 		return false
 	}
-
 	fmt.Printf("clusterID: %s\n", clusterID)
+
+	err = c.updateStatus(clusterID, "created", kluster)
+	if err != nil {
+		log.Printf("error updating status: %v", err)
+		return false
+	}
+
 	return true
+}
+
+func (c *Controller) updateStatus(id string, progress string, kluster *v1alpha1.Kluster) error {
+	kluster.Status.KlusterID = id
+	kluster.Status.Progress = progress
+	_, err := c.klient.ShenzhuV1alpha1().Klusters(kluster.Namespace).UpdateStatus(context.Background(), kluster, metav1.UpdateOptions{})
+
+	return err
 }
 
 func (c *Controller) handleAdd(obj interface{}) {
