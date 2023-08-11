@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/kanisterio/kanister/pkg/poll"
 	"github.com/shenzhu/kluster/pkg/apis/shenzhu.dev/v1alpha1"
 	klientset "github.com/shenzhu/kluster/pkg/client/clientset/versioned"
 	kinf "github.com/shenzhu/kluster/pkg/client/informers/externalversions/shenzhu.dev/v1alpha1"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -34,6 +36,8 @@ type Controller struct {
 
 	// queue
 	wq workqueue.RateLimitingInterface
+
+	recorder record.EventRecorder
 }
 
 func NewController(client kubernetes.Interface, klient klientset.Interface, klusterInformer kinf.KlusterInformer) *Controller {
@@ -108,19 +112,52 @@ func (c *Controller) processNextItem() bool {
 	}
 	fmt.Printf("clusterID: %s\n", clusterID)
 
-	err = c.updateStatus(clusterID, "created", kluster)
+	err = c.updateStatus(clusterID, "creating", kluster)
 	if err != nil {
 		log.Printf("error updating status: %v", err)
 		return false
 	}
 
+	err = c.waitForCluster(kluster.Spec, clusterID)
+	if err != nil {
+		log.Printf("error waiting for cluster: %v", err)
+	}
+
+	err = c.updateStatus(clusterID, "running", kluster)
+	if err != nil {
+		log.Printf("error updating status: %v", err)
+	}
+
 	return true
 }
 
+func (c *Controller) waitForCluster(spec v1alpha1.KlusterSpec, clusterID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	return poll.Wait(ctx, func(ctx context.Context) (bool, error) {
+		state, err := do.ClusterState(c.client, spec, clusterID)
+		if err != nil {
+			return false, err
+		}
+		if state == "running" {
+			return true, nil
+		}
+
+		return false, nil
+	})
+}
+
 func (c *Controller) updateStatus(id string, progress string, kluster *v1alpha1.Kluster) error {
-	kluster.Status.KlusterID = id
-	kluster.Status.Progress = progress
-	_, err := c.klient.ShenzhuV1alpha1().Klusters(kluster.Namespace).UpdateStatus(context.Background(), kluster, metav1.UpdateOptions{})
+	// get the latest version of kluster
+	k, err := c.klient.ShenzhuV1alpha1().Klusters(kluster.Namespace).Get(context.Background(), kluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	k.Status.KlusterID = id
+	k.Status.Progress = progress
+	_, err = c.klient.ShenzhuV1alpha1().Klusters(kluster.Namespace).UpdateStatus(context.Background(), k, metav1.UpdateOptions{})
 
 	return err
 }
